@@ -1,0 +1,163 @@
+package com.tienda.informatica.gui;
+
+import com.tienda.informatica.application.service.ProductoAlquiladoService;
+import com.tienda.informatica.domain.model.ProductoAlquilado;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.List;
+
+public final class ProductoAlquiladoPanel extends BaseCrudPanel<ProductoAlquilado> {
+    private final ProductoAlquiladoService productoService;
+
+    public ProductoAlquiladoPanel() {
+        productoService = new ProductoAlquiladoService(new ProductoAlquiladoRepositoryJdbcAdapter());
+        configurarBotones();
+        configurarModeloTabla();
+        actualizarTabla();
+    }
+
+    private void configurarBotones() {
+        btnNuevo.addActionListener(e -> mostrarFormularioCrear());
+        btnEliminar.addActionListener(e -> eliminarRegistro());
+        btnActualizar.addActionListener(e -> actualizarTabla());
+        // Puedes implementar btnEditar si quieres permitir edición
+    }
+
+    @Override
+    protected void configurarModeloTabla() {
+        tableModel.addColumn("Código");
+        tableModel.addColumn("Precio/Hora");
+        tableModel.addColumn("Tipo");
+        tableModel.addColumn("Resolución");
+        tableModel.addColumn("Capacidad");
+    }
+
+    @Override
+    protected void mostrarFormularioCrear() {
+        JDialog dialog = createDialog("Nuevo Producto Alquilado", 450, 300);
+        JPanel panel = createFormPanel();
+
+        JTextField txtCodigo = new JTextField();
+        JTextField txtPrecio = new JTextField();
+        JComboBox<String> cmbTipo = new JComboBox<>(new String[]{"MONITOR", "DISCO_DURO"});
+        JTextField txtResolucion = new JTextField();
+        JTextField txtCapacidad = new JTextField();
+
+        panel.add(new JLabel("Código:"));
+        panel.add(txtCodigo);
+        panel.add(new JLabel("Precio por Hora:"));
+        panel.add(txtPrecio);
+        panel.add(new JLabel("Tipo de Producto:"));
+        panel.add(cmbTipo);
+        panel.add(new JLabel("Resolución (solo monitor):"));
+        panel.add(txtResolucion);
+        panel.add(new JLabel("Capacidad (solo disco duro):"));
+        panel.add(txtCapacidad);
+
+        addFormButtons(dialog, panel, () -> {
+            try {
+                String codigo = txtCodigo.getText();
+                double precio = Double.parseDouble(txtPrecio.getText());
+                String tipo = (String) cmbTipo.getSelectedItem();
+                
+                ProductoAlquilado producto;
+                if ("MONITOR".equals(tipo)) {
+                    producto = new ProductoAlquilado(codigo, precio, txtResolucion.getText());
+                } else {
+                    int capacidad = Integer.parseInt(txtCapacidad.getText());
+                    producto = new ProductoAlquilado(codigo, precio, capacidad);
+                }
+                
+                productoService.crearProductoAlquilado(producto);
+                mostrarMensajeExito("Producto registrado correctamente.");
+                actualizarTabla();
+            } catch (NumberFormatException ex) {
+                mostrarMensajeError("Precio o capacidad no válidos.");
+            }
+        });
+
+        dialog.setVisible(true);
+    }
+
+    @Override
+    protected void eliminarRegistro() {
+        int fila = table.getSelectedRow();
+        if (fila == -1) {
+            mostrarMensajeError("Seleccione un producto para eliminar");
+            return;
+        }
+
+        String codigo = (String) tableModel.getValueAt(fila, 0);
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "¿Está seguro de eliminar el producto con código " + codigo + "?",
+                "Confirmar eliminación", JOptionPane.YES_NO_OPTION);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            productoService.eliminarProductoAlquilado(codigo);
+            mostrarMensajeExito("Producto eliminado exitosamente");
+            actualizarTabla();
+        }
+    }
+
+    @Override
+    protected void actualizarTabla() {
+        tableModel.setRowCount(0);
+        for (ProductoAlquilado p : obtenerTodosLosRegistros()) {
+            tableModel.addRow(new Object[]{
+                    p.getCodigo(),
+                    p.getPrecioPorHora(),
+                    p.getTipoProducto(),
+                    p.getResolucionMaxima() != null ? p.getResolucionMaxima() : "",
+                    p.getCapacidadAlmacenamiento() != 0 ? p.getCapacidadAlmacenamiento() + " GB" : ""
+            });
+        }
+    }
+
+    @Override
+    protected List<ProductoAlquilado> obtenerTodosLosRegistros() {
+        return productoService.getAllProductosAlquilados();
+    }
+
+    // Métodos reutilizables
+    private JDialog createDialog(String title, int width, int height) {
+        JDialog dialog = new JDialog();
+        dialog.setTitle(title);
+        dialog.setModal(true);
+        dialog.setSize(width, height);
+        dialog.setLocationRelativeTo(this);
+        return dialog;
+    }
+
+    private JPanel createFormPanel() {
+        JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        return panel;
+    }
+
+    private void addFormButtons(JDialog dialog, JPanel formPanel, Runnable saveAction) {
+        JButton btnGuardar = new JButton("Guardar");
+        JButton btnCancelar = new JButton("Cancelar");
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(btnCancelar);
+        buttonPanel.add(btnGuardar);
+
+        btnGuardar.addActionListener(e -> {
+            saveAction.run();
+            dialog.dispose();
+        });
+
+        btnCancelar.addActionListener(e -> dialog.dispose());
+
+        dialog.setLayout(new BorderLayout());
+        dialog.add(formPanel, BorderLayout.CENTER);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+    }
+
+    @Override
+    protected void editarRegistro() {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    }
+}
